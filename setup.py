@@ -6,11 +6,12 @@ setup(
     include_package_data=True,
     packages=find_packages(),
     install_requires=[
+        "flask",
     ],
     # install function as script
     entry_points={
         'console_scripts': [
-            'raspi-irrigation=raspi-irrigation.main:main',
+            'run-irrigation=raspi_irrigation.main:main',
         ],
     },
 )
