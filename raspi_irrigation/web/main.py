@@ -1,5 +1,5 @@
 import flask
-
+import datetime
 
 def run_webserver():
     """
@@ -10,6 +10,7 @@ def run_webserver():
 
     @app.route('/')
     def index():
-        return "Hello"
+        timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+        return f"Hello. The current time is {timestamp}"
 
     app.run(debug=True, host='0.0.0.0')
