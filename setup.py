@@ -7,6 +7,9 @@ setup(
     packages=find_packages(),
     install_requires=[
         "flask",
+        "numpy",
+        "matplotlib",
+        "pandas",
     ],
     # install function as script
     entry_points={
