@@ -1,0 +1,11 @@
+[
+    {
+        "model": "irrigation_app.observable",
+        "pk": 1,
+        "fields": {
+            "name": "Soil moisture",
+            "short_name": "sm",
+            "unit": "m^3/m^3"
+        }
+    }
+]

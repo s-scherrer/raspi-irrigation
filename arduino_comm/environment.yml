@@ -1,0 +1,15 @@
+name: arduino_comm_dev
+channels:
+  - defaults
+dependencies:
+  - python=3.8.5
+  - pip
+  - pip:
+    - -r file:requirements.txt
+    - pytest
+    - pytest-cov
+    - python-language-server
+    - pydocstyle
+    - pycodestyle
+    - black
+    - black-macchiato

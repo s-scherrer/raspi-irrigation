@@ -1,0 +1,29 @@
+version: "3.9"
+   
+volumes:
+  postgresdata:
+  common:
+services:
+  db:
+    image: postgres
+    volumes:
+      - postgresdata:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=secret_password
+  webapp:
+    build: webapp
+    volumes:
+      - common:/common:ro
+    command: python manage.py runserver 0.0.0.0:8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+  arduino_comm:
+    build: arduino_comm
+    volumes:
+      - common:/common:ro
+    depends_on:
+      - db

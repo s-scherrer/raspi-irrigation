@@ -1,0 +1,13 @@
+name: riwa_dev
+channels:
+  - defaults
+dependencies:
+  - python=3.8.5
+  - pip
+  - pip:
+    - -r file:requirements.txt
+    - pytest
+    - pytest-cov
+    - 'python-language-server[pycodestyle,pydocstyle]'
+    - black
+    - black-macchiato
