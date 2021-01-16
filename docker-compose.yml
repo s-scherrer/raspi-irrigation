@@ -1,29 +1,52 @@
-version: "3.9"
+version: "3.8"
    
-volumes:
-  postgresdata:
-  common:
 services:
   db:
     image: postgres
     volumes:
-      - postgresdata:/var/lib/postgresql/data
+      - ./postgresdata:/var/lib/postgresql/data
     environment:
       - POSTGRES_DB=postgres
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=secret_password
   webapp:
     build: webapp
-    volumes:
-      - common:/common:ro
-    command: python manage.py runserver 0.0.0.0:8000
     ports:
       - "8000:8000"
     depends_on:
       - db
+    volumes:
+      - ./webapp:/code
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=secret_password
+      - POSTGRES_HOST=db
   arduino_comm:
     build: arduino_comm
-    volumes:
-      - common:/common:ro
     depends_on:
       - db
+    volumes:
+      - ./arduino_comm:/code
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=secret_password
+      - POSTGRES_HOST=db
+      - TEST_WEBAPP=1
+  pgadmin:
+    image: dpage/pgadmin4
+    ports:
+      - 15432:80
+    depends_on:
+      - db
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=secret_password
+      - POSTGRES_HOST=db
+      - PGADMIN_DEFAULT_EMAIL=admin@pgadmin.com
+      - PGADMIN_DEFAULT_PASSWORD=password
+      - PGADMIN_LISTEN_PORT=80
+    volumes:
+      - ./pgadmin:/var/lib/pgadmin

@@ -3,13 +3,13 @@ channels:
   - defaults
 dependencies:
   - python=3.8.5
+  - numpy
+  - psycopg2
   - pip
   - pip:
-    - -r file:requirements.txt
+    - watchdog
     - pytest
     - pytest-cov
-    - python-language-server
-    - pydocstyle
-    - pycodestyle
+    - 'python-language-server[pycodestyle,pydocstyle]'
     - black
     - black-macchiato

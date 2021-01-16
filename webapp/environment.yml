@@ -3,9 +3,12 @@ channels:
   - defaults
 dependencies:
   - python=3.8.5
+  - numpy
+  - psycopg2
   - pip
   - pip:
-    - -r file:requirements.txt
+    - django
+    - watchdog
     - pytest
     - pytest-cov
     - 'python-language-server[pycodestyle,pydocstyle]'

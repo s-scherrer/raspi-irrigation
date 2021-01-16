@@ -1,5 +1,5 @@
-FROM continuumio/miniconda3
+FROM continuumio/miniconda3:4.9.2
 WORKDIR /code
 COPY . /code/
-RUN conda install -y --file /code/requirements.txt
-CMD ["/opt/conda/bin/python", "/code/run_arduino_comm.py"]
+RUN conda env update -n base -f /code/environment.yml
+ENTRYPOINT python run_arduino_comm.py
