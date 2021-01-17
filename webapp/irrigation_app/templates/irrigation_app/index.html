@@ -1,0 +1,27 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+    <head>
+        <meta charset="utf-8">
+        <script src="{% static 'irrigation_app/plotly-latest.min.js' %}"></script>
+        <!-- <script src="https://cdn.plot.ly/plotly-latest.min.js"></script> -->
+        <title>My cool plot</title>
+    </head>
+    <body>
+        Hello!
+        <div id="tester" style="width:1000px;height:600px;"></div>
+    </body>
+</html>
+<script> 
+    var data = JSON.parse("{{data|escapejs}}"); 
+    var dataNode = document.getElementById("tester"); 
+
+    var trace = {
+        x: data["times"],
+        y: data["values"],
+        type: "scatter"
+    };
+    
+    Plotly.newPlot(dataNode, [trace], {margin: {t: 0}});
+</script>
