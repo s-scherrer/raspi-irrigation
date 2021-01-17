@@ -1,39 +1,29 @@
-# from django.http import HttpResponse
+from datetime import datetime, timezone, timedelta
 from django.shortcuts import render
-# from io import BytesIO
 from json import dumps
-# import base64
-# import matplotlib.pyplot as plt
-import numpy as np
 
 
-from irrigation_app.models import Measurement
+from irrigation_app.models import Measurement, Observable
 
 
 def index(request):
 
-    measurements = Measurement.objects.all()
+    start_time = datetime.now(timezone.utc) - timedelta(days=1)
+    observables = Observable.objects.order_by('id').all()
+    measurements = Measurement.objects.exclude(time__lt=start_time)
 
-    data = {"times": [], "values": []}
-    for m in measurements:
-        data["times"].append(m.time.isoformat())
-        data["values"].append(m.value)
-
-    # plt.style.use("seaborn")
-    # fig, ax = plt.subplots()
-    # ax.plot(times, values, 'o-')
-    # ax.set_xlabel("Time")
-    # ax.set_ylabel("Soil moisture")
-
-    # # save plot as png string
-    # buf = BytesIO()
-    # plt.savefig(buf, format="png")
-    # buf.seek(0)
-    # image = buf.getvalue()
-    # buf.close()
-    # image = base64.b64encode(image)
-    # image = image.decode('utf-8')
-
-    # return render(request, 'index.html', {"image": image})
+    # insert a dictionary for each observable containing variable name, unit,
+    # and data
+    data = []
+    for o in observables:
+        item = {}
+        item["name"] = o.name
+        item["unit"] = o.unit
+        item["times"] = []
+        item["values"] = []
+        for m in measurements.filter(observable__id=o.id):
+            item["times"].append(m.time.isoformat())
+            item["values"].append(m.value)
+        data.append(item)
 
     return render(request, 'irrigation_app/index.html', {"data": dumps(data)})

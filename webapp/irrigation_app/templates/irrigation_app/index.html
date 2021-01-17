@@ -4,24 +4,44 @@
 <html lang="en" dir="ltr">
     <head>
         <meta charset="utf-8">
+        <link rel="stylesheet" href="{% static 'irrigation_app/mytheme.css' %}">
         <script src="{% static 'irrigation_app/plotly-latest.min.js' %}"></script>
-        <!-- <script src="https://cdn.plot.ly/plotly-latest.min.js"></script> -->
-        <title>My cool plot</title>
+        <title>Raspberry Pi Irrigation</title>
     </head>
     <body>
-        Hello!
-        <div id="tester" style="width:1000px;height:600px;"></div>
+        <h1>Raspberry Pi Irrigation</h1>
+        <h2>Soil moisture data</h2>
+        <div class="column" id="tester" style="height: 60%"></div>
     </body>
 </html>
 <script> 
     var data = JSON.parse("{{data|escapejs}}"); 
-    var dataNode = document.getElementById("tester"); 
+    var traces = [];
 
-    var trace = {
-        x: data["times"],
-        y: data["values"],
-        type: "scatter"
-    };
+    for (d of data) {
+        traces.push({
+            x: d["times"],
+            y: d["values"],
+            mode: 'lines+markers',
+            name: d["name"] + ' ' + d["unit"]
+        });
+    }
+
+    var layout = {
+        autosize: true,
+        modebar: {
+            orientation: "h",
+        },
+        showlegend: true,
+        legend: {
+            orientation: "h",
+            y: 1.1
+        },
+        xaxis: {
+            title: 'Time'
+        }
+    }; 
     
-    Plotly.newPlot(dataNode, [trace], {margin: {t: 0}});
+    var plotNode = document.getElementById("tester"); 
+    Plotly.newPlot(plotNode, traces, layout);
 </script>

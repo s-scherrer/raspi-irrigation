@@ -1,0 +1,684 @@
+#+TITLE:  Self learning irrigation with Raspberry Pi and Arduino
+
+* Introduction
+  
+I am a Raspberry Pi (raspi in the following) and Arduino beginner with a
+background in soil science and a bit of machine learning. In order to apply my
+purely theoretical knowledge of machine learning to a real project, and to
+learn about reinforcement learning, electronics, and software development, I
+chose to implement yet another irrigation system.
+
+The main feature of the system should be that it learns how to irrigate by
+itself. This is done by evaluating the soil moisture as target variable and
+possibly other variables (e.g. humidity, air temperature, radiation, time of
+day, season). Optimal/permissible soil moisture values are obtained in an
+initial measurement-only period.
+
+I split the project into two parts:
+- setting up the sensors and a web interface
+- implementing & training a reinforcement learning algorithm
+The first part is mainly software development and electronics, the second part
+mainly statistics.
+
+The project is overall much more complicated than it has to be - since
+irrigation is not exactly a unique purpose of a raspi there are already many
+described systems and libraries out there that would probably do most of what I
+want for the first part. Also, it would be sufficient to connect the sensors
+directly to the raspi instead of using the Arduino.
+However, the main purpose of this project is to learn about electronics,
+software development (especially containers, web development, and databases),
+and machine learning, so I decided to rather make it a bit more complex.
+
+The first part of the project therefore involves:
+- a web application written in django
+- a postgresql database
+- a background process that communicates with the Arduino
+- all components packaged as Docker containers and using docker-compose for
+  running them 
+
+* Preparation
+
+** Parts
+
+I bought my parts at https://www.berrybase.de/, since I live in Germany. Here's
+what I bought:
+
+- Raspberry Pi Zero W, SD card, power supply
+- Arduino Starter Kit
+- AM2302 temperature/humidity sensor
+- A cheap resistive soil moisture sensor, since they didn't have the
+  capacitative soil moisture sensor anymore. This will probably not last very
+  long, but I didn't want to wait any longer
+  
+** Raspberry Pi OS setup
+
+Installing Raspberry Pi OS on a SD card normally isn't very complicated from a
+Linux system, but since I don't have a mini HDMI adapter I have to setup the SD
+card so that the raspi should automatically be in my wifi network and I should
+be able to access it via ssh.
+To enable ssh, create the empty file ~/boot/ssh~ as decribed [[https://www.raspberrypi.org/documentation/remote-access/ssh/][here]], by mounting
+the ~boot~ partition of the SD card in your computer after you installed
+Raspberry Pi OS on it. Since I did this when I visited my parents and forgot to
+take my SD card reader with me, I had to use the Windows machine of my parents
+which had an SD card reader included. On Windows, creating the empty file can
+be done in the PowerShell using ~New-Item ssh -ItemType file~ (after changing
+into the mounted boot directory).
+
+To get access to the wifi network, the file ~/boot/wpa_supplicant.conf~ with
+the following contents has to be created (as described [[https://thedatafrog.com/en/articles/raspberry-pi-zero-headless-install/][here]]):
+#+BEGIN_SRC 
+ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+update_config=1
+country=DE
+
+network={
+     ssid="The name of your wifi network"
+     psk="Your password"
+     key_mgmt=WPA-PSK
+}
+#+END_SRC
+The drawback of this is that then the wifi key is stored in plain text on the
+raspi, but this is something I can live with.
+
+Additionally, you can change its hostname by editing ~/etc/hostname~. The raspi
+can then be found using ~ping <hostname>.local~. (On openSUSE I had to allow
+mdns in the firewall settings to access it.)
+
+Once you have ssh access, you can run ~raspi-config~ to set everything up and
+update the system.
+
+
+** Development environment
+
+I normally use Emacs with ~lsp-mode~ for python development. This works also
+fine in combination with conda environments, as long as
+~python-language-server~ (and the binary ~pyls~) is installed inside the
+environments. However, when using docker containers, I actually want to have
+~pyls~ running inside the container, so I have the correct environment (package
+versions, etc.). I could set up the conda environments that are used inside the
+docker container on the host too, and then run ~pyls~ on the host. With conda
+this would probably even work quite well, but it's not a perfect solution.
+After much research and troubleshooting, I found that I can use TRAMP to edit
+files inside a docker container with emacs.
+I installed the packages ~docker~ and ~docker-tramp~ from Melpa:
+
+#+begin_src emacs-lisp
+(use-package docker
+  :ensure t
+  :config
+  (use-package docker-tramp
+    :ensure t)
+
+  ;; required for LSP in conda containers
+  (add-to-list 'tramp-remote-path "/opt/conda/bin")
+)
+#+end_src
+
+As I found out after some time, I also had to add the path to the conda
+binaries to ~tramp-remote-path~, so that emacs finds my ~python~ and ~pyls~.
+The reason for using conda over using a system python inside the container
+becomes apparent later on.
+
+Additionally, I added the following in the ~:config~ section of my ~lsp-mode~
+configuration:
+
+#+begin_src emacs-lisp
+  (progn
+    (add-hook 'python-mode-hook #'lsp)
+    (lsp-register-client
+     (make-lsp-client :new-connection (lsp-tramp-connection "pyls")
+                      :major-modes '(python-mode)
+                      :remote? t
+                      :server-id 'pyls-remote)))
+#+end_src
+
+
+* Part I: Measurement setup
+
+The goals of the first project part are:
+- writing a web application and a background process that communicates with the
+  Arduino, and have both of them access a postgres database
+- connecting the sensors with the Arduino
+
+Since I'm much better at programming than at soldering, I started with the
+programming parts.
+
+** Software
+
+To easily deploy my application when it's ready, I will use ~docker~ (and also to
+learn more about dockerized software development). Since my software has
+multiple components, I will also use ~docker-compose~ to make them all work
+nicely together.
+
+*** First Steps
+
+**** docker-compose
+
+Let's start with a ~docker-compose~-development setup, stored in the top level
+directory as ~docker-compose.dev.yml~:
+
+#+begin_src yaml
+version: "3.8"
+   
+services:
+  db:
+    image: postgres
+    volumes:
+      - ./postgresdata:/var/lib/postgresql/data
+    env_file: .env.dev
+  webapp:
+    build: webapp
+    ports:
+      - 8000:8000
+    depends_on:
+      - db
+    volumes:
+      - ./webapp:/code
+    env_file: .env.dev
+  arduino_comm:
+    build: arduino_comm
+    depends_on:
+      - db
+    volumes:
+      - ./arduino_comm:/code
+    env_file: .env.dev
+    entrypoint: watchmedo auto-restart --recursive --pattern="*.py" --directory="." python run_arduino_comm.py
+  webapp_tests:
+    build: webapp
+    depends_on:
+      - db
+    env_file: .env.dev
+    entrypoint: pytest
+  arduino_comm_tests:
+    build: arduino_comm
+    depends_on:
+      - db
+    env_file: .env.dev
+    entrypoint: pytest
+  pgadmin:
+    image: dpage/pgadmin4
+    ports:
+      - 15432:80
+    depends_on:
+      - db
+    env_file: .env.dev
+    volumes:
+      - ./pgadmin:/var/lib/pgadmin
+#+end_src
+
+This file defines the database container ~db~, the ~webapp~ container, the
+~arduino_comm~ container, additionally a ~pgadmin~ container to have a web
+interface to the database, and two services that run tests.
+The database and ~pgadmin~ are using an image from DockerHub, ~webapp~ and
+~arduino_comm~ will be built based on their ~Dockerfile~ in the respective
+directories. For development purposes, all containers have bind mount volumes
+defined, so that e.g. the database persists, and that changes I make to code
+inside the container also happens on the host machine in source control.
+The ~pgadmin~ and the ~webapp~ containers also define port mappings so they are
+accessible from the host system.
+
+For the ~arduino_comm~ container I also define a custom entrypoint. This uses
+~watchdog~ (which therefore must be installed inside the container) to check if
+files have changed and restarts the service upon a file change.
+This makes it easy to develop inside the container, because everytime I save a
+file I directly see the changes.
+For the webapp this is not necessary, since django brings its own reloader.
+
+Additionally, all containers share some common environment variables that set
+the database user and password, and some other settings. These are defined in
+~.env.dev~:
+
+#+begin_src text
+# Postgres settings
+POSTGRES_DB=postgres
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=secret_password
+POSTGRES_HOST=db
+
+# This makes arduino_comm return random values instead of measurements
+TEST_WEBAPP=1
+
+# pgadmin settings
+PGADMIN_DEFAULT_EMAIL=admin@pgadmin.com
+PGADMIN_DEFAULT_PASSWORD=password
+PGADMIN_LISTEN_PORT=80
+#+end_src
+
+With this file (and the Dockerfiles defined later), one can build and start all
+containers with
+#+begin_src bash
+sudo docker-compose -f docker-compose.dev.yml build
+sudo docker-compose -f docker-compose.dev.yml up
+#+end_src
+
+Useful links:
+- https://hackernoon.com/efficient-development-with-docker-and-docker-compose-e354b4d24831
+
+**** Webapp in django
+
+The webapp is written in [[https://docs.djangoproject.com/en/3.1/][django]], a python web framework. I followed the first
+steps from the [[https://docs.djangoproject.com/en/3.1/intro/tutorial01/][tutorial]] to create a project called ~irrigation~ and an app called
+~irrigation_app~. I additionally made some changes to
+~webapp/irrigation/settings.py~ that were necessary for using postgres:
+
+#+begin_src python
+POSTGRES_HOST = os.getenv("POSTGRES_HOST")
+POSTGRES_DB = os.getenv("POSTGRES_DB")
+POSTGRES_USER = os.getenv("POSTGRES_USER")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': POSTGRES_DB,
+        'USER': POSTGRES_USER,
+        'PASSWORD': POSTGRES_PASSWORD,
+        'HOST': POSTGRES_HOST,
+        'PORT': 5432,
+    }
+}
+#+end_src
+
+Then I defined my first two models (i.e. database tables): observables and
+measurements. These are defined in ~webapp/irrigation_app/models.py~:
+
+#+begin_src python
+from django.db import models
+
+
+class Observable(models.Model):
+    """
+    A variable that can be observed.
+
+    These should be only provided via fixtures.
+    """
+    name = models.CharField(max_length=30)
+    short_name = models.CharField(max_length=10)
+    unit = models.CharField(max_length=20)
+
+
+class Measurement(models.Model):
+    """A measurement value read from the arduino"""
+    time = models.DateTimeField("measurement time")
+    observable = models.ForeignKey(Observable, on_delete=models.PROTECT)
+    value = models.FloatField()
+#+end_src
+
+It's simple: A measurement has a value, a time, and the associated observable
+that was measured, and an observable object simply stores some metadata for the
+observable (name, unit). Measurements will be created by the ~arduino_comm~
+process when the sensors are running, observables will be pre-defined via
+[[https://docs.djangoproject.com/en/3.1/howto/initial-data/][fixtures]] in ~webapp/irrigation_app/fixtures/observables.json~:
+
+#+begin_src json
+[
+    {
+        "model": "irrigation_app.observable",
+        "pk": 1,
+        "fields": {
+            "name": "Soil moisture",
+            "short_name": "sm",
+            "unit": "m^3/m^3"
+        }
+    }
+]
+#+end_src
+
+For now it only consists of soil moisture as observable, but I will add
+humidity and temperature in the future.
+
+The main purpose of the webapp is to display/plot the measured data from the
+database. For interactive plots it is best to use JavaScript, so that all the
+interactive part runs on the client (web browser) and not on the raspi.
+I decided to use [[https://plotly.com/javascript/getting-started/][plotly]] for this, because it looks nice and is really easy to
+get started. I downloaded the minified source and stored it in
+~webapp/irrigation_app/static/irrigation_app/plotly-latest.min.js~.
+Then I created a HTML template in
+~webapp/irrigation_app/templates/irrigation_app/index.html~:
+
+#+begin_src html
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+    <head>
+        <meta charset="utf-8">
+        <link rel="stylesheet" href="{% static 'irrigation_app/mytheme.css' %}">
+        <script src="{% static 'irrigation_app/plotly-latest.min.js' %}"></script>
+        <title>Raspberry Pi Irrigation</title>
+    </head>
+    <body>
+        <h1>Raspberry Pi Irrigation</h1>
+        <h2>Soil moisture data</h2>
+        <div class="column" id="tester" style="height: 60%"></div>
+    </body>
+</html>
+<script> 
+    var data = JSON.parse("{{data|escapejs}}"); 
+    var traces = [];
+
+    for (d of data) {
+        traces.push({
+            x: d["times"],
+            y: d["values"],
+            mode: 'lines+markers',
+            name: d["name"] + ' ' + d["unit"]
+        });
+    }
+
+    var layout = {
+        autosize: true,
+        modebar: {
+            orientation: "h",
+        },
+        showlegend: true,
+        legend: {
+            orientation: "h",
+            y: 1.1
+        },
+        xaxis: {
+            title: 'Time'
+        }
+    }; 
+    
+    var plotNode = document.getElementById("tester"); 
+    Plotly.newPlot(plotNode, traces, layout);
+</script>
+#+end_src
+
+This loads the plotly source in the header, and defines an additional script at
+the bottom that parses JSON data and defines a simple line plot. It also apples
+a CSS stylesheet, that is oriented at the jekyll-theme /minimal/:
+
+#+begin_src css
+html, body { background: white; }
+
+body {
+    color: black;
+    font-family: monospace;
+    font-size: 1.3rem;
+    line-height: 1.3;
+    margin: 0;
+    min-height: 100%;
+}
+
+h1 {
+    text-align: center;
+}
+
+h2 {
+    text-align: center;
+}
+
+div.column {
+    width: 800px;
+    margin: auto;
+}
+
+@media only screen and (max-width: 1000px) {
+    div.column {
+        width: 80%;
+        margin-left: 10%;
+        margin-right: 10%;
+    }
+}
+
+@media only screen and (max-width: 600px) {
+    div.column {
+        width: 100%;
+        margin-left: 0;
+        margin-right: 0;
+    }
+}
+#+end_src
+
+
+The JSON data comes from django, where we have to define a view (in
+~webapp/irrigation_app/views.py~):
+
+#+begin_src python
+from django.shortcuts import render
+from json import dumps
+
+
+from irrigation_app.models import Measurement
+
+
+def index(request):
+
+    measurements = Measurement.objects.all()
+
+    data = {"times": [], "values": []}
+    for m in measurements:
+        data["times"].append(m.time.isoformat())
+        data["values"].append(m.value)
+
+    return render(request, 'irrigation_app/index.html', {"data": dumps(data)})
+#+end_src
+
+This is the method that is called on the server when someone visits the
+webpage. It basically just reads all measurements and returns measurement times
+and values as JSON. In the future, there should also be some filtering applied
+(since there will be a lot of data), and metadata (observable type) should be
+passed too, but for now it's enough.
+Additionally to the view we have to define the URLs in django, inside
+~webapp/irrigation_app/urls.py~:
+
+#+begin_src python
+from django.urls import path
+
+from . import views
+
+
+urlpatterns = [
+    path('', views.index, name='index')
+]
+#+end_src
+
+***** Launching django
+
+When launching the web app, multiple things have to happen before:
+- collect static files
+- database migrations
+- applying initial data (fixtures)
+- starting the development webserver
+I put all of these inside a bash script, which can then be used by docker as an
+entrypoint:
+
+#+begin_src bash
+#!/bin/bash
+
+# Collect static files
+echo "Collect static files"
+python manage.py collectstatic --noinput
+
+# Apply database migrations
+echo "Apply database migrations"
+python manage.py migrate
+echo "Load fixtures"
+python manage.py loaddata observables
+
+# Start server
+echo "Starting server"
+python manage.py runserver 0.0.0.0:8000
+#+end_src
+
+***** Dependencies and Docker
+
+I decided to use ~continuumio/miniconda3~ as base image for my python
+containers, since conda makes it easier to install the necessary dependencies,
+especially ~numpy~ and ~psycopg2~ (the latter is necessary for communication
+with the postgres database). My first tries to install them manually on top of
+a python image failed due to missing dependencies.
+The Dockerfile then looked like this:
+
+#+begin_src text
+FROM continuumio/miniconda3:4.9.2
+WORKDIR /code
+COPY . /code/
+RUN conda env update -n base -f /code/environment.yml
+ENTRYPOINT ["/bin/bash", "./docker-entrypoint.sh"]
+#+end_src
+
+It loads dependencies from the file ~webapp/environment.yml~:
+
+#+begin_src yaml
+name: riwa_dev
+channels:
+  - defaults
+dependencies:
+  - python=3.8.5
+  - numpy
+  - matplotlib
+  - psycopg2
+  - pip
+  - pip:
+    - django
+    - watchdog
+    - pytest
+    - pytest-cov
+    - 'python-language-server[pycodestyle,pydocstyle]'
+    - black
+    - black-macchiato
+#+end_src
+
+This can also be used to locally set up the environment, but as described
+before I decided to rather run emacs via tramp directly inside the container.
+
+**** Arduino communication module test mode
+
+The Arduino communication module is also written in python (because this is the
+language I know best). It is also based on a ~continuumio/miniconda3~ image,
+and the Dockerfile therefore looks pretty similar, only a different command is
+run as entrypoint. These are not shown here.
+
+For a start, I implemented a test mode, where the process generates random data
+instead of reading it from the arduino. The code for this is:
+
+#+begin_src python
+#!/usr/bin/env python3
+
+# Script that reads data from the arduino and writes it to database
+
+from datetime import datetime, timezone
+import logging
+import numpy as np
+import os
+import psycopg2
+import time
+
+from writer import DataWriter
+
+
+# set up logging
+TEST_WEBAPP = os.getenv("TEST_WEBAPP")
+if TEST_WEBAPP:
+    loglevel = logging.DEBUG
+else:
+    loglevel = logging.INFO
+logging.basicConfig(
+    filename="arduino_comm.log",
+    encoding="utf-8",
+    level=loglevel,
+)
+
+
+# connect to database
+POSTGRES_HOST = os.getenv("POSTGRES_HOST")
+POSTGRES_DB = os.getenv("POSTGRES_DB")
+POSTGRES_USER = os.getenv("POSTGRES_USER")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
+logging.info(f"Connecting to database {POSTGRES_DB} on {POSTGRES_HOST}")
+conn = psycopg2.connect(
+    f"dbname={POSTGRES_DB} user={POSTGRES_USER}"
+    f" password={POSTGRES_PASSWORD} host={POSTGRES_HOST}"
+)
+try:
+    logging.info("Connected to database.")
+    writer = DataWriter(conn)
+
+    if TEST_WEBAPP:
+        logging.debug("Running in test mode.")
+        logging.debug("This means random data is generated.")
+
+        while True:
+            x = np.random.randn()
+            t = datetime.now(timezone.utc)
+            y = np.sin(2*np.pi*t.timestamp()/3600) + 0.2*x
+            logging.debug(t.isoformat())
+            writer.write_measurement(t, y, 1)
+            time.sleep(10)
+    else:
+        logging.debug("Running in production mode.")
+except:
+    raise
+finally:
+    conn.close()
+    logging.info("Done!")
+#+end_src
+
+The main part is hidden behind the call to ~writer.write_measurement~. The
+~DataWriter~ class is defined in ~arduino_comm/writer.py~:
+
+#+begin_src python
+"""
+Writer class for retrieved data.
+"""
+
+
+class DataWriter:
+    """Writes measured data to database."""
+
+    def __init__(self, conn):
+        """
+        Parameters
+        ----------
+        conn : database connection
+        """
+        self.conn = conn
+        with self.conn.cursor() as cur:
+            cur.execute(
+                "SELECT * from public.irrigation_app_measurement"
+                " ORDER BY id DESC"
+            )
+            last_measurement = cur.fetchone()
+            if last_measurement is None:
+                self.last_id = -1
+            else:
+                self.last_id = last_measurement[0]
+
+    def write_measurement(self, time, value, obs_id):
+        """
+        Writes single measurement to database.
+
+        Parameters
+        ----------
+        time : datetime.datetime
+            Measurement time
+        value : float
+            Measured value
+        obs_id : int
+            ID of the observable that was measured. See
+            `webapp/irrigation_app/fixtures/observables.json` for available
+            values.
+        """
+        cur = self.conn.cursor()
+        with self.conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO public.irrigation_app_measurement"
+                " (id, time, value, observable_id) VALUES (%s, %s, %s, %s)",
+                (self.last_id + 1, time, value, obs_id)
+            )
+            self.last_id += 1
+#+end_src
+
+This class writes the measurements into the database.
+
+**** Wrap up
+
+With this, we have now a basic web app that we can view in the browser. If you
+run the docker-compose ~build~ and ~up~ commands as described above, you should
+be able to see it in your browser at ~localhost:8000~.
+
+#+CAPTION: Webapp after 1 hour of random data
+[[./media/screenshot_index.png]]

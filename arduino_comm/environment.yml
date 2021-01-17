@@ -5,9 +5,9 @@ dependencies:
   - python=3.8.5
   - numpy
   - psycopg2
+  - watchdog
   - pip
   - pip:
-    - watchdog
     - pytest
     - pytest-cov
     - 'python-language-server[pycodestyle,pydocstyle]'

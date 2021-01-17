@@ -13,16 +13,16 @@ class DataWriter:
         conn : database connection
         """
         self.conn = conn
-        cur = self.conn.cursor()
-        cur.execute(
-            "SELECT * from public.irrigation_app_measurement ORDER BY id DESC"
-        )
-        last_measurement = cur.fetchone()
-        if last_measurement is None:
-            self.last_id = -1
-        else:
-            self.last_id = last_measurement[0]
-        cur.close()
+        with self.conn.cursor() as cur:
+            cur.execute(
+                "SELECT * from public.irrigation_app_measurement"
+                " ORDER BY id DESC"
+            )
+            last_measurement = cur.fetchone()
+            if last_measurement is None:
+                self.last_id = -1
+            else:
+                self.last_id = last_measurement[0]
 
     def write_measurement(self, time, value, obs_id):
         """
@@ -40,11 +40,10 @@ class DataWriter:
             values.
         """
         cur = self.conn.cursor()
-        cur.execute(
-            "INSERT INTO public.irrigation_app_measurement"
-            " (id, time, value, observable_id) VALUES (%s, %s, %s, %s)",
-            (self.last_id + 1, time, value, obs_id)
-        )
-        self.last_id += 1
-        self.conn.commit()
-        cur.close()
+        with self.conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO public.irrigation_app_measurement"
+                " (id, time, value, observable_id) VALUES (%s, %s, %s, %s)",
+                (self.last_id + 1, time, value, obs_id)
+            )
+            self.last_id += 1

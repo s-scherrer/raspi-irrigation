@@ -5,7 +5,7 @@
         "fields": {
             "name": "Soil moisture",
             "short_name": "sm",
-            "unit": "m^3/m^3"
+            "unit": "m³/m³"
         }
     }
 ]
