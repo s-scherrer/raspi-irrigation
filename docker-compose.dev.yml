@@ -27,12 +27,16 @@ services:
     build: webapp
     depends_on:
       - db
+    volumes:
+      - ./webapp:/code
     env_file: .env.dev
     entrypoint: pytest
   arduino_comm_tests:
     build: arduino_comm
     depends_on:
       - db
+    volumes:
+      - ./arduino_comm:/code
     env_file: .env.dev
     entrypoint: pytest
   pgadmin:
