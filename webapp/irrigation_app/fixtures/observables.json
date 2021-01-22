@@ -7,5 +7,23 @@
             "short_name": "sm",
             "unit": "m³/m³"
         }
+    },
+    {
+        "model": "irrigation_app.observable",
+        "pk": 2,
+        "fields": {
+            "name": "Relative humidity",
+            "short_name": "rh",
+            "unit": "%"
+        }
+    },
+    {
+        "model": "irrigation_app.observable",
+        "pk": 3,
+        "fields": {
+            "name": "Air temperature",
+            "short_name": "ta",
+            "unit": "°C"
+        }
     }
 ]

@@ -20,7 +20,6 @@ else:
     loglevel = logging.INFO
 logging.basicConfig(
     filename="arduino_comm.log",
-    encoding="utf-8",
     level=loglevel,
 )
 
@@ -35,6 +34,8 @@ conn = psycopg2.connect(
     f"dbname={POSTGRES_DB} user={POSTGRES_USER}"
     f" password={POSTGRES_PASSWORD} host={POSTGRES_HOST}"
 )
+conn.autocommit = True
+
 try:
     logging.info("Connected to database.")
     writer = DataWriter(conn)
@@ -49,6 +50,8 @@ try:
             y = np.sin(2*np.pi*t.timestamp()/3600) + 0.2*x
             logging.debug(t.isoformat())
             writer.write_measurement(t, y, 1)
+            writer.write_measurement(t, 100*(2-y)/2, 2)
+            writer.write_measurement(t, np.sin(t.timestamp())+y, 3)
             time.sleep(10)
     else:
         logging.debug("Running in production mode.")

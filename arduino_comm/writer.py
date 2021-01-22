@@ -2,6 +2,8 @@
 Writer class for retrieved data.
 """
 
+import logging
+
 
 class DataWriter:
     """Writes measured data to database."""
@@ -23,6 +25,7 @@ class DataWriter:
                 self.last_id = -1
             else:
                 self.last_id = last_measurement[0]
+            logging.debug(f"Last ID = {self.last_id}")
 
     def write_measurement(self, time, value, obs_id):
         """
@@ -41,9 +44,14 @@ class DataWriter:
         """
         cur = self.conn.cursor()
         with self.conn.cursor() as cur:
+            logging.debug(
+                f"Inserting with ID = {self.last_id+1}, value = {value},"
+                f" observation ID = {obs_id}."
+            )
             cur.execute(
                 "INSERT INTO public.irrigation_app_measurement"
                 " (id, time, value, observable_id) VALUES (%s, %s, %s, %s)",
                 (self.last_id + 1, time, value, obs_id)
             )
             self.last_id += 1
+            logging.debug("Done")

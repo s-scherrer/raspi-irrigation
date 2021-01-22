@@ -1,0 +1,62 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+    <head>
+        <meta charset="utf-8">
+        <link rel="stylesheet" href="{% static 'irrigation_app/mytheme.css' %}">
+        <script src="{% static 'irrigation_app/plotly-latest.min.js' %}"></script>
+        <title>Raspberry Pi Irrigation</title>
+    </head>
+    <body>
+        <h1>Raspberry Pi Irrigation - Data</h1>
+        <div class="column" id="plots"></div>
+    </body>
+</html>
+<script> 
+    var data = JSON.parse("{{data|escapejs}}"); 
+    var traces = [];
+
+    for (var obs in data) {
+        traces.push({
+            x: data[obs]['times'],
+            y: data[obs]['values'],
+            mode: 'lines+markers',
+            name: obs,
+            xaxis: "x",
+        });
+    }
+
+
+    var layout = {
+        autosize: true,
+        modebar: {orientation: 'v'},
+        grid: {
+            rows: 2,
+            columns: 1,
+            pattern: 'independent',
+            roworder: 'top to bottom'
+        },
+        showlegend: true,
+        legend: {orientation: "h", y: 1.1},
+        xaxis: {title: "Time"},
+        margin: {t: 0, l: 50, r: 50, b: 50},
+    }; 
+    // assign the correct labels and domain to the different traces
+    var nt = traces.length;
+    for (i = 0; i < nt; i++) {
+        // assign trace to yaxis
+        traces[i]["yaxis"] = "y" + (i+1);
+        // layout for this yaxis
+        var buf = 0.02
+        layout["yaxis" + (i+1)] = {
+            title: traces[i]["name"],
+            titlefont: {size: 12},
+            zeroline: false,
+            domain: [i/nt+buf, (i+1)/nt-buf]
+        };
+        layout["xaxis" + (i+1)] = {showticklabels: false};
+    }
+    
+    Plotly.newPlot('plots', traces, layout);
+</script>
