@@ -1,0 +1,126 @@
+* Intro
+
+TODO
+
+* Components
+** Docker setup
+- install docker + docker-compose
+- sudo systemctl start docker.service
+- some links and description of docker-compose
+** Data logging with Arduino
+- description of code and wiring
+** Database
+
+*** postgres
+
+The data generated with the Arduino should be stored in a database. I use a
+postgresql database for this. To make things easy, I just use the official
+docker image.
+
+The docker-compose section then looks like this, following
+https://www.docker.com/blog/how-to-use-the-postgres-docker-official-image/
+
+#+begin_src
+  db:
+    image: postgres
+    restart: always
+    volumes:
+      - ./postgresdata:/var/lib/postgresql/data
+    env_file: .env.dev
+#+end_src
+
+Contrary to the example shown in the blog post, I use an environment file, so
+that the other processes can also access important settings.
+
+*** pgadmin
+
+For having a nice interface to interact with the database, I use pgadmin. I
+also use an official docker image for this. The docker-compose section on this
+looks like this:
+
+#+begin_src
+  pgadmin:
+    image: dpage/pgadmin4
+    ports:
+      - 15432:80
+    depends_on:
+      - db
+    env_file: .env.dev
+    volumes:
+      - ./pgadmin:/var/lib/pgadmin
+#+end_src
+
+The first time the full application runs (via ~sudo docker-compose -f
+docker-compose.yml up~), this create the directory ~pgadmin~ in the top level
+directory of the repository. You should make sure that this belongs to user and
+group ID 5050, e.g. run ~sudo chown -R 5050:5050 pgadmin~, especially if you
+see messages like
+
+#+begin_src
+ERROR  : Failed to create the directory /var/lib/pgadmin/sessions:
+           [Errno 13] Permission denied: '/var/lib/pgadmin/sessions'
+HINT   : Create the directory /var/lib/pgadmin/sessions, ensure it is writeable by
+         'pgadmin', and try again, or, create a config_local.py file
+         and override the SESSION_DB_PATH setting per
+         https://www.pgadmin.org/docs/pgadmin4/6.16/config_py.html
+#+end_src
+
+*** Troubleshooting
+
+If you delete (for whatever reasons) the database directory, it can happen that
+the webapp and the arduino-comm module complain about not being able to access
+the database. What worked for me was:
+- restart the app (i.e. stop the current run and run docker-compose up again)
+- if this doesn't help, you can remove all the images and containers and start
+  again from scratch
+
+** Arduino reader
+- reads the data from the arduino and stores it in the database
+
+** Web app
+
+*** Overview
+
+The web app should provide a nice view of the data, i.e. it is mainly a
+front-end. However, since I also define the database models within django, it
+is really /the/ core component of this whole project.
+
+Since the data we have are quite simple (we could actually just written it to a
+csv file), there are only 2 very simple models, defined in
+~webapp/irrigation_app/models.py~:
+- an ~Observable~, i.e a type of measurement, containing some metadata
+  (e.g. name and unit), and
+- a ~Measurement~, i.e. a single instance of a measurement containing the type,
+  time, and value.
+
+The observables are defined in
+~webapp/irrigation_app/fixtures/observables.json~, which currently contains
+only relative humidity and air temperature.
+
+The database to use is specified in ~webapp/irrigation/settings.py~. Currently,
+it reads the settings from environment variables which are set by
+docker-compose.
+
+
+The webpage showing the data is defined via:
+- ~webapp/irrigation_app/views.py~: The data view function (which is currently
+  the only view) reads all data from the last 24 hours and passes them on to
+  plotly.
+- The template containing the plotly setup is defined in
+  ~webapp/irrigation_app/templates/irrigation_app/data.html~
+
+
+*** Docker setup
+- https://www.digitalocean.com/community/tutorials/how-to-build-a-django-and-gunicorn-application-with-docker
+
+I followed the guide above to some extent, but I used a conda image as base to
+make things easier.
+
+Additionally, I created a ~docker-entrypoint.sh~ script that is used as command
+by docker. It does everything that is necessary to start the app, e.g. applying
+migrations, loading fixtures, and creating a superuser.
+
+The application is run using ~gunicorn~.
+
+
+** Test modules

@@ -1,0 +1,14 @@
+* Arduino code setup
+
+The code for the arduino can be found in ~arduino_code~. The actual code is in
+~arduino_code/sketch_temp_sensor~, and there is an additional zipped library
+~arduino_code/cactus_io_AM2302.zip~.
+
+To upload the code to the Arduino, install the Arduino IDE for linux (download
+zip file), then do:
+1) open the ~sketch_temp_sensor.ino~ file via the GUI
+2) import the library (Sketch -> Include Library)
+3) select the board from the dropdown menu
+
+If you run into permission error while uploading, try ~sudo chmod a+rw
+/dev/ttyACM0~ (or whatever the device name is).

@@ -5,6 +5,7 @@ dependencies:
   - python=3.8.5
   - numpy
   - psycopg2
+  - gunicorn
   - pip
   - pip:
     - django

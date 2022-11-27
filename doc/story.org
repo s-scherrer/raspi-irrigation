@@ -682,3 +682,14 @@ be able to see it in your browser at ~localhost:8000~.
 
 #+CAPTION: Webapp after 1 hour of random data
 [[./media/screenshot_index.png]]
+
+
+* Step-by-step guide
+
+1) Clone github repo.
+2) Install docker and docker-compose from official repos.
+3) Start docker service if not already running: ~sudo systemctl start docker.service~
+4) ~sudo docker-compose -f docker-compose.dev.yml build~
+5) ~sudo docker-compose -f docker-compose.dev.yml up~
+   (if running into permission issues with pgadmin, try ~sudo chown -R 5050:5050 pgadmin~)
+6) The web service should now be accessible at ~localhost:8000~

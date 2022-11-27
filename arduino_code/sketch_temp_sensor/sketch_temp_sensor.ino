@@ -2,6 +2,7 @@
 #include <cactus_io_AM2302.h>
 
 # define MINUTE 60000
+# define SECOND 1000
 
 #define LCD_SWITCH 2
 #define LCD_REGISTER_SELECT 3
@@ -16,7 +17,7 @@
 
 #define HUMIDITY_ID 2
 #define TEMPERATURE_ID 3
-#define AM2302_INTERVAL 10*MINUTE
+#define AM2302_INTERVAL 10*SECOND
 
 
 /*

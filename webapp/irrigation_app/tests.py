@@ -10,6 +10,5 @@ class IrrigationAppTest(TestCase):
     def test_observables():
         observables = Observable.objects.order_by('id').all()
 
-        assert observables[0].short_name == "sm"
-        assert observables[1].short_name == "rh"
-        assert observables[2].short_name == "ta"
+        assert observables[0].short_name == "rh"
+        assert observables[1].short_name == "ta"

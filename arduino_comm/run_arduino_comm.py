@@ -23,6 +23,7 @@ logging.basicConfig(
     level=loglevel,
 )
 
+time.sleep(20)
 
 # connect to database
 POSTGRES_HOST = os.getenv("POSTGRES_HOST")
@@ -51,7 +52,6 @@ try:
             logging.debug(t.isoformat())
             writer.write_measurement(t, y, 1)
             writer.write_measurement(t, 100*(2-y)/2, 2)
-            writer.write_measurement(t, np.sin(t.timestamp())+y, 3)
             time.sleep(10)
     else:
         logging.debug("Running in production mode.")
