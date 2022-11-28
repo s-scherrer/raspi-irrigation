@@ -10,12 +10,12 @@ python manage.py migrate
 echo "Load fixtures"
 python manage.py loaddata observables
 
-python manage.py shell -c "from django.contrib.auth.models import User;
-from django.db.utils import IntegrityError
-try:
-    User.objects.create_superuser(username='${DJANGO_ADMIN_NAME}', password='${DJANGO_ADMIN_PASSWORD}', email='admin@admin.test')
-except IntegrityError:
-    pass"
+# python manage.py shell -c "from django.contrib.auth.models import User;
+# from django.db.utils import IntegrityError
+# try:
+#     User.objects.create_superuser(username='${DJANGO_ADMIN_NAME}', password='${DJANGO_ADMIN_PASSWORD}', email='admin@admin.test')
+# except IntegrityError:
+#     pass"
 
 
 # Start server
