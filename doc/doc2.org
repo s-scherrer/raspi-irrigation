@@ -34,9 +34,9 @@ that the other processes can also access important settings.
 
 *** pgadmin
 
-For having a nice interface to interact with the database, I use pgadmin. I
-also use an official docker image for this. The docker-compose section on this
-looks like this:
+For having a nice interface to interact with the database, I use pgadmin.
+I also use an official docker image for this. The docker-compose section on
+this looks like this:
 
 #+begin_src
   pgadmin:
@@ -49,6 +49,10 @@ looks like this:
     volumes:
       - ./pgadmin:/var/lib/pgadmin
 #+end_src
+
+The web interface can be accessed on port 15432. When adding a server, set the
+hostname to "db", and the username and password as in the postgres settings in
+the environment file.
 
 The first time the full application runs (via ~sudo docker-compose -f
 docker-compose.yml up~), this create the directory ~pgadmin~ in the top level
@@ -124,3 +128,32 @@ The application is run using ~gunicorn~.
 
 
 ** Test modules
+
+* Hosting on RPi
+** Docker setup
+
+On Raspbian, currently it's recommended to use the [[https://docs.docker.com/engine/install/debian/#install-using-the-convenience-script][convenience script]]
+to install docker.
+
+** Get the code and adapt for local settings
+
+To get the code, it is enough to do a simple git clone. However, we still need
+to set environment variables (passwords) for the production setting and set the
+tty of the serial connection to the Arduino.
+
+For the latter, ~ls -l /dev/serial/by-id~ can be helpful. In my case, this gave
+the following output:
+#+begin_src 
+total 0
+lrwxrwxrwx 1 root root 13 Nov 20 21:17 usb-Arduino__www.arduino.cc__0043_9573632373235191D142-if00 -> ../../ttyACM0
+#+end_src
+i.e, the serial connection is on ~/dev/ttyACM0~.
+
+** Firewall
+
+To allow incoming traffic to port 8000 (where the webpage is hosted), the
+firewall might have to be adapted via ~sudo ufw allow in 8000~.
+
+TODOs:
+- create .env.prod file
+- run docker container

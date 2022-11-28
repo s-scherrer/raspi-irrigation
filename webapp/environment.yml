@@ -2,7 +2,7 @@ name: riwa_dev
 channels:
   - defaults
 dependencies:
-  - python=3.8.5
+  - python=3.10
   - numpy
   - psycopg2
   - gunicorn

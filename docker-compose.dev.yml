@@ -41,7 +41,7 @@ services:
     env_file: .env.dev
     entrypoint: pytest
   pgadmin:
-    image: dpage/pgadmin4
+    image: truecharts/pgadmin4:6.16.0
     ports:
       - 15432:80
     depends_on:

@@ -15,8 +15,10 @@
 #define AM2302_PIN 10
 #define STATUS_PIN 13
 
-#define HUMIDITY_ID 2
-#define TEMPERATURE_ID 3
+#define HUMIDITY_ID 1
+#define TEMPERATURE_ID 2
+// with 8 bytes per measurement and 2 observations, 10s correspond
+// to 50MB of data per year
 #define AM2302_INTERVAL 10*SECOND
 
 

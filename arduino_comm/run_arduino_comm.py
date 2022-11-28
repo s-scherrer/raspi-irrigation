@@ -7,9 +7,11 @@ import logging
 import numpy as np
 import os
 import psycopg2
+import serial
 import time
 
 from writer import DataWriter
+from reader import DataReader
 
 
 # set up logging
@@ -23,7 +25,11 @@ logging.basicConfig(
     level=loglevel,
 )
 
+# we wait some time so all the other processes have some time to start
 time.sleep(20)
+
+# tty of the arudino serial connection, e.g. /dev/ttyACM0
+ARDUINO_SERIAL_TTY = os.getenv("ARDUINO_SERIAL_TTY")
 
 # connect to database
 POSTGRES_HOST = os.getenv("POSTGRES_HOST")
@@ -48,13 +54,23 @@ try:
         while True:
             x = np.random.randn()
             t = datetime.now(timezone.utc)
-            y = np.sin(2*np.pi*t.timestamp()/3600) + 0.2*x
+            y = np.sin(2 * np.pi * t.timestamp() / 3600) + 0.2 * x
             logging.debug(t.isoformat())
             writer.write_measurement(t, y, 1)
-            writer.write_measurement(t, 100*(2-y)/2, 2)
+            writer.write_measurement(t, 100 * (2 - y) / 2, 2)
             time.sleep(10)
     else:
         logging.debug("Running in production mode.")
+        # default baudrate of Arduino is 9600
+        # after 3600 seconds = 1 hour without data, stop
+        with serial.Serial(ARDUINO_SERIAL_TTY, 9600, timeout=3600) as ser:
+            # the first line is "Finished setup!" and should be skipped
+            ser.readline()
+            reader = DataReader(ser)
+            while reader.readline():
+                t = datetime.now(timezone.utc)
+                id, val = reader.obs
+                writer.write_measurement(t, val, id)
 except:
     raise
 finally:

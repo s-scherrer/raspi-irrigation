@@ -29,6 +29,8 @@ DEBUG = os.getenv('DJANGO_DEBUG', False)
 
 ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '127.0.0.1').split(',')
 
+ADMIN_ENABLED = os.getenv('DJANGO_ADMIN_ENABLE', False)
+
 
 
 # Application definition

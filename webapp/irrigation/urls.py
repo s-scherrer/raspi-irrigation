@@ -20,6 +20,8 @@ from . import settings
 
 urlpatterns = [
     path('', include('irrigation_app.urls')),
-    path('admin/', admin.site.urls),
-] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+]
+if settings.ADMIN_ENABLED:
+    urlpatterns.append(path('admin/', admin.site.urls))
 
+urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
