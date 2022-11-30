@@ -4,9 +4,10 @@
 
 from datetime import datetime, timezone
 import logging
-import numpy as np
+import math
 import os
 import psycopg2
+import random
 import serial
 import time
 
@@ -52,9 +53,9 @@ try:
         logging.debug("This means random data is generated.")
 
         while True:
-            x = np.random.randn()
+            x = random.normalvariate(0, 1)
             t = datetime.now(timezone.utc)
-            y = np.sin(2 * np.pi * t.timestamp() / 3600) + 0.2 * x
+            y = math.sin(2 * math.pi * t.timestamp() / 3600) + 0.2 * x
             logging.debug(t.isoformat())
             writer.write_measurement(t, y, 1)
             writer.write_measurement(t, 100 * (2 - y) / 2, 2)

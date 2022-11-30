@@ -3,10 +3,6 @@
 TODO
 
 * Components
-** Docker setup
-- install docker + docker-compose
-- sudo systemctl start docker.service
-- some links and description of docker-compose
 ** Data logging with Arduino
 - description of code and wiring
 ** Database
@@ -113,27 +109,40 @@ The webpage showing the data is defined via:
 - The template containing the plotly setup is defined in
   ~webapp/irrigation_app/templates/irrigation_app/data.html~
 
+The application is run using ~gunicorn~ (defined in ~webapp/docker-entrypoint.sh~).
 
-*** Docker setup
+** Docker setup
+First steps:
+- install docker + docker-compose
+- ~sudo systemctl start docker.service~
+
+Resources:
 - https://www.digitalocean.com/community/tutorials/how-to-build-a-django-and-gunicorn-application-with-docker
 
-I followed the guide above to some extent, but I used a conda image as base to
-make things easier.
+Initially I wanted to use the miniconda3 image as base for both the arduino
+communcation module and the web app, to have an easy way to install psycopg2,
+but this is only available for arm64 (i.e. on newer RPis, but I have an RPi 2).
 
-Additionally, I created a ~docker-entrypoint.sh~ script that is used as command
-by docker. It does everything that is necessary to start the app, e.g. applying
-migrations, loading fixtures, and creating a superuser.
+Instead, I opted used alpine, following the guide listed above. An important
+dependency I had to add was ~musl-dev~, because otherwise the installation of
+~psycopg2~ failed due to missing header files.
 
-The application is run using ~gunicorn~.
-
+Since the python environment is very similar between both the webapp and the
+arduino communcation module, I chose to create a single Dockerfile for both,
+which resides in ~alpine_python_psycopg2~. The two different containers then
+both base on this image, but load their own code into the container, and define
+separate entrypoints.
 
 ** Test modules
+
 
 * Hosting on RPi
 ** Docker setup
 
 On Raspbian, currently it's recommended to use the [[https://docs.docker.com/engine/install/debian/#install-using-the-convenience-script][convenience script]]
-to install docker.
+to install docker. Instead of the standalone ~docker-compose~, this installs
+the compose plugin, which can be run by omitting the dash, i.e. replace
+~docker-compose~ by ~docker compose~ (no dash) in all compose commands.
 
 ** Get the code and adapt for local settings
 
@@ -155,5 +164,10 @@ To allow incoming traffic to port 8000 (where the webpage is hosted), the
 firewall might have to be adapted via ~sudo ufw allow in 8000~.
 
 TODOs:
-- create .env.prod file
+- install newer OS on raspi
+  - no, this won't work, because the raspi is too old
+  -> need to replace the conda image by a custom image that also works with 32-bit arm
+  - miniconda does not work at all with arm
+  - the only package that is not straightforward to install with pip is psycopg2
 - run docker container
+
