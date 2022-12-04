@@ -15,8 +15,19 @@ from writer import DataWriter
 from reader import DataReader
 
 
+def make_bool(b):
+    if isinstance(b, bool):
+        return b
+    elif isinstance(b, (int, float)):
+        return b != 0
+    elif isinstance(b, str):
+        return b not in ["0", "false", "False"]
+    else:
+        raise ValueError(f"Unknown format for bool: {b}")
+
+
 # set up logging
-TEST_WEBAPP = os.getenv("TEST_WEBAPP")
+TEST_WEBAPP = make_bool(os.getenv("TEST_WEBAPP", False))
 if TEST_WEBAPP:
     loglevel = logging.DEBUG
 else:
@@ -25,6 +36,7 @@ logging.basicConfig(
     filename="arduino_comm.log",
     level=loglevel,
 )
+logging.debug(f"TEST_WEBAPP = {TEST_WEBAPP}")
 
 # we wait some time so all the other processes have some time to start
 time.sleep(20)

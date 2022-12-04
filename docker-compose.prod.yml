@@ -23,14 +23,7 @@ services:
       - db
     volumes:
       - ./arduino_comm:/code
+    devices:
+      - "${ARDUINO_SERIAL_TTY:?err}:${ARDUINO_SERIAL_TTY:?err}"
     env_file: .env.prod
     entrypoint: python run_arduino_comm.py
-  pgadmin:
-    image: truecharts/pgadmin4:6.16.0
-    ports:
-      - 15432:80
-    depends_on:
-      - db
-    env_file: .env.prod
-    volumes:
-      - ./pgadmin:/var/lib/pgadmin
