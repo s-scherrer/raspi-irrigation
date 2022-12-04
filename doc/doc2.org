@@ -137,13 +137,6 @@ separate entrypoints.
 
 
 * Hosting on RPi
-** Docker setup
-
-On Raspbian, currently it's recommended to use the [[https://docs.docker.com/engine/install/debian/#install-using-the-convenience-script][convenience script]]
-to install docker. Instead of the standalone ~docker-compose~, this installs
-the compose plugin, which can be run by omitting the dash, i.e. replace
-~docker-compose~ by ~docker compose~ (no dash) in all compose commands.
-
 ** Get the code and adapt for local settings
 
 To get the code, it is enough to do a simple git clone. However, we still need
@@ -157,6 +150,21 @@ total 0
 lrwxrwxrwx 1 root root 13 Nov 20 21:17 usb-Arduino__www.arduino.cc__0043_9573632373235191D142-if00 -> ../../ttyACM0
 #+end_src
 i.e, the serial connection is on ~/dev/ttyACM0~.
+
+** Docker setup
+
+On Raspbian, currently it's recommended to use the [[https://docs.docker.com/engine/install/debian/#install-using-the-convenience-script][convenience script]]
+to install docker. Instead of the standalone ~docker-compose~, this installs
+the compose plugin, which can be run by omitting the dash, i.e. replace
+~docker-compose~ by ~docker compose~ (no dash) in all compose commands.
+
+The first run with docker compose failed due to an issue related to [[https://github.com/docker/compose/issues/6023][this]]. The
+solution is also detailed in the GH issue:
+#+begin_src bash
+sudo apt install gnupg2 pass 
+gpg2 --full-generate-key
+pass init <key-id>
+#+end_src
 
 ** Firewall
 
