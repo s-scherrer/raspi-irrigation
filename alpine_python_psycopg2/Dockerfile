@@ -1,7 +1,6 @@
 FROM alpine:latest
 WORKDIR /code
 COPY . /code/
-ADD ./requirements.txt /code/requirements.txt
 RUN set -ex \
     && apk update \
     && apk add --no-cache gcc musl-dev python3-dev libpq-dev \

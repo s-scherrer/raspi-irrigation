@@ -8,6 +8,7 @@ class DataReader:
 
     def readline(self):
         line = self.ser.readline()
+        logging.debug(f"Read line: {line}")
         try:
             self.obs = self.parse_line(line)
         except struct.error:
@@ -20,4 +21,5 @@ class DataReader:
         id = struct.unpack("H", line[0:2])[0]
         # the next 4 bytes are the value as float
         val = struct.unpack("f", line[2:6])[0]
+        logging.debug(f"Parsed line: ID = {id}, value = {val}")
         return id, val
