@@ -123,6 +123,10 @@ Initially I wanted to use the miniconda3 image as base for both the arduino
 communcation module and the web app, to have an easy way to install psycopg2,
 but this is only available for arm64 (i.e. on newer RPis, but I have an RPi 2).
 
+I also tried alpine, but ran into issues with network access due to time64
+requirements (see [[https://github.com/alpinelinux/docker-alpine/issues/135][here]] and [[https://wiki.alpinelinux.org/wiki/Release_Notes_for_Alpine_3.13.0#time64_requirements][here]]). A similar issue also applies to running the
+latest debian image. A proper solution would require 
+
 Instead, I opted used alpine, following the guide listed above. An important
 dependency I had to add was ~musl-dev~, because otherwise the installation of
 ~psycopg2~ failed due to missing header files.
@@ -166,7 +170,18 @@ gpg2 --full-generate-key
 pass init <key-id>
 #+end_src
 
+
 ** Firewall
+
+When using ufw, the firewall has to be adapted using [[https://github.com/chaifeng/ufw-docker][ufw-docker]]:
+#+begin_src bash
+sudo wget -O /usr/local/bin/ufw-docker \
+  https://github.com/chaifeng/ufw-docker/raw/master/ufw-docker
+sudo chmod +x /usr/local/bin/ufw-docker
+sudo ufw-docker install
+sudo systemctl restart ufw
+#+end_src
+
 
 To allow incoming traffic to port 8000 (where the webpage is hosted), the
 firewall might have to be adapted via ~sudo ufw allow in 8000~.
